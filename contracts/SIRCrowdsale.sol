@@ -280,22 +280,18 @@ contract Crowdsale is Ownable  {
 
     // start and end timestamps where investments are allowed (both inclusive)
     uint256 public startTime;
-    uint256 public endTimeStageOne;
     // address where funds are collected
     address public wallet;
 
     // amount of raised money in wei
     uint256 public weiRaised;
     uint256 public tokenAllocated;
-	uint256 public cap = 400 * 10**18;
 
-    function Crowdsale(uint256 _startTime, uint256 _endTime, address _wallet) public {
-        //require(_startTime >= now);
-        require(_endTime >= _startTime);
+    function Crowdsale(uint256 _startTime, address _wallet) public {
+        require(_startTime >= now);
         require(_wallet != address(0));
 
         startTime = _startTime;
-        endTimeStageOne = _endTime;
         wallet = _wallet;
     }
 }
@@ -308,18 +304,17 @@ contract SIRCrowdsale is Ownable, Crowdsale, MintableToken {
     State public state;
 
     mapping(address => uint256) public deposited;
-    uint256 public constant INITIAL_SUPPLY = 475 * (10**5) * (10 ** uint256(decimals));
-    uint256 public reservFund = 25 * (10**5) * (10 ** uint256(decimals));
+    uint256 public constant INITIAL_SUPPLY = 500 * (10**5) * (10 ** uint256(decimals));
+    uint256 public fundTeam = 25 * (10**5) * (10 ** uint256(decimals));
     uint256 public tokenCapReached = 475 * (10**5) * (10 ** uint256(decimals));
     uint256 public weiMinimum = 4 * 10**15;
     uint256 public countInvestor;
 
     event TokenPurchase(address indexed beneficiary, uint256 value, uint256 amount);
-    event CapReached(uint256 weiRaised, uint256 value);
-    event TokenMintReached(uint256 tokenRaised, uint256 amountToken);
+    event TokenLimitReached(uint256 tokenRaised, uint256 purchasedToken);
 
-    function SIRCrowdsale(uint256 _startTime, uint256 _endTime, address _owner, address _wallet) public
-    Crowdsale(_startTime, _endTime, _wallet)
+    function SIRCrowdsale(uint256 _startTime, address _owner, address _wallet) public
+    Crowdsale(_startTime, _wallet)
     {
         require(_wallet != address(0));
         require(_owner != address(0));
@@ -343,17 +338,14 @@ contract SIRCrowdsale is Ownable, Crowdsale, MintableToken {
         require(state == State.Active);
         require(_investor != address(0));
         uint256 weiAmount = msg.value;
-        if(weiAmount < weiMinimum){revert();}
+        require(weiAmount >= weiMinimum);
+        //if(weiAmount < weiMinimum){revert();}
         // calculate token amount to be created
         uint256 tokens = validPurchaseTokens(weiAmount);
-
-        if(tokens == 0){
-            revert();
-        }
-
+        if(tokens == 0){revert();}
         weiRaised = weiRaised.add(weiAmount);
         tokenAllocated = tokenAllocated.add(tokens);
-        mint(_investor, tokens, wallet);
+        mint(_investor, tokens, owner);
 
         TokenPurchase(_investor, weiAmount, tokens);
         if(deposited[_investor] == 0){
@@ -367,14 +359,37 @@ contract SIRCrowdsale is Ownable, Crowdsale, MintableToken {
     function getTotalAmountOfTokens(uint256 _weiAmount) internal constant returns (uint256 amountOfTokens) {
         uint256 currentTokenRate = 0;
         uint256 currentDate = now;
-        //uint256 currentDate = 1518307199; // 10 Feb 2018
+        //uint256 currentDate = 1517792400; // 05 Feb 2018
+        //uint256 currentDate = 1518397200; // 12 Feb 2018
+        //uint256 currentDate = 1519002000; // 19 Feb 2018
+        //uint256 currentDate = 1519606800; // 26 Feb 2018
+        //uint256 currentDate = 1520211600; // 05 Mar 2018
+        //uint256 currentDate = 1520816400; // 12 Mar 2018
+        //uint256 currentDate = 1521421200; // 19 Mar 2018
+        //uint256 currentDate = 1522026000; // 26 Mar 2018
+        //uint256 currentDate = 1525136400; // 01 May 2018
         require(currentDate >= startTime);
 
-        if (currentDate >= startTime) {
+        if (currentDate >= startTime && currentDate < (startTime + 1 weeks)) {
             return currentTokenRate = _weiAmount.mul(8000);
+        } else if (currentDate >= (startTime + 1 weeks) && currentDate < (startTime + 2 weeks)) {
+            return currentTokenRate = _weiAmount.mul(4000);
+        } else if (currentDate >= (startTime + 2 weeks) && currentDate < (startTime + 3 weeks)) {
+            return currentTokenRate = _weiAmount.mul(2667);
+        } else if (currentDate >= (startTime + 3 weeks) && currentDate < (startTime + 4 weeks)) {
+            return currentTokenRate = _weiAmount.mul(2000);
+        } else if (currentDate >= (startTime + 4 weeks) && currentDate < (startTime + 5 weeks)) {
+            return currentTokenRate = _weiAmount.mul(1600);
+        } else if (currentDate >= (startTime + 5 weeks) && currentDate < (startTime + 6 weeks)) {
+            return currentTokenRate = _weiAmount.mul(1333);
+        } else if (currentDate >= (startTime + 6 weeks) && currentDate < (startTime + 7 weeks)) {
+            return currentTokenRate = _weiAmount.mul(1143);
+        } else if (currentDate >= (startTime + 7 weeks) ) {
+            return currentTokenRate = _weiAmount.mul(1000);
         } else {
             return currentTokenRate = _weiAmount.mul(0);
         }
+
     }
 
     function deposit(address investor) internal {
@@ -394,17 +409,20 @@ contract SIRCrowdsale is Ownable, Crowdsale, MintableToken {
     }
 
     function validPurchaseTokens(uint256 _weiAmount) public returns (uint256) {
-        uint256 tokens = getTotalAmountOfTokens(_weiAmount);
-        if(tokenAllocated.add(tokens) >= tokenCapReached){
-            TokenMintReached(tokenAllocated, tokens);
+        uint256 addTokens = getTotalAmountOfTokens(_weiAmount);
+        if(tokenAllocated.add(addTokens) > tokenCapReached){
+            TokenLimitReached(tokenAllocated, addTokens);
             return 0;
         }
-        if(weiRaised.add(_weiAmount) >= cap){
-            CapReached(weiRaised, _weiAmount);
-            return 0;
-        }
-        return tokens;
+        return addTokens;
     }
+
+/*
+    function testDate() public view returns (bool){
+        uint256 currentDate = 1517792400; // 05 Feb 2018
+        return currentDate >= startTime && currentDate < (startTime + 1 weeks);
+    }
+*/
 
 }
 

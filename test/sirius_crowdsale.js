@@ -1,14 +1,17 @@
 var SIRCrowdsale = artifacts.require("./SIRCrowdsale.sol");
+//import assertRevert from './helpers/assertRevert';
 
 contract('SIRCrowdsale', (accounts) => {
     var contract;
-    var owner = "0x920630D883Db8430B657b0A246913FF201E6598f";
-    var rate = 13000;
+    var owner = "0x02882944f2bA15818A306DeE1d91FbA6D03d12A6";
+    var rate = 1000;
     var buyWei = 5 * 10**17;
-    var rateNew = 13000;
+    var rateNew = 1000;
     var buyWeiNew = 5 * 10**17;
-    var totalSupply = 5 * 10**24;
-    var buyWeiCap = 400 * 10**18;
+    var buyWeiMin = 3 * 10**15;
+    var buyWeiCap = 600 * 10**24;
+
+    var totalSupply = 50 * 10**24;
 
     it('should deployed contract', async ()  => {
         assert.equal(undefined, contract);
@@ -23,8 +26,16 @@ contract('SIRCrowdsale', (accounts) => {
     it('verification balance owner contract', async ()  => {
         var balanceOwner = await contract.balanceOf(owner);
         //console.log("balanceOwner = " + balanceOwner);
-        assert.notEqual(totalSupply, balanceOwner);
+        assert.equal(totalSupply, balanceOwner);
     });
+
+/*
+    it('verification date', async ()  => {
+        var result = await contract.testDate.call();
+        //console.log("result = " + result);
+        assert.equal(true, result);
+    });
+*/
 
 
     it('verification of receiving Ether', async ()  => {
@@ -33,9 +44,10 @@ contract('SIRCrowdsale', (accounts) => {
         var weiRaisedBefore = await contract.weiRaised.call();
         //console.log("tokenAllocated = " + tokenAllocatedBefore);
 
-        await contract.buyTokens(accounts[2],{from:accounts[2], value:buyWei});1
+        await contract.buyTokens(accounts[2],{from:accounts[2], value:buyWei});
         var tokenAllocatedAfter = await contract.tokenAllocated.call();
         //console.log("tokenAllocatedAfter = " + tokenAllocatedAfter);
+
         assert.isTrue(tokenAllocatedBefore < tokenAllocatedAfter);
         assert.equal(0, tokenAllocatedBefore);
         assert.equal(rate*buyWei, tokenAllocatedAfter);
@@ -55,6 +67,7 @@ contract('SIRCrowdsale', (accounts) => {
         //console.log("DepositedAfter = " + depositedAfter);
         assert.equal(buyWei, depositedAfter);
 
+
         var balanceAccountThreeBefore = await contract.balanceOf(accounts[3]);
         await contract.buyTokens(accounts[3],{from:accounts[3], value:buyWeiNew});
         var balanceAccountThreeAfter = await contract.balanceOf(accounts[3]);
@@ -63,17 +76,21 @@ contract('SIRCrowdsale', (accounts) => {
         //console.log("balanceAccountThreeAfter = " + balanceAccountThreeAfter);
         assert.equal(rateNew*buyWeiNew, balanceAccountThreeAfter);
 
-        var tokenAllocatedEnd = await contract.tokenAllocated.call();
-        //console.log("tokenAllocatedEnd = " + tokenAllocatedEnd);
-
         var balanceOwnerAfter = await contract.balanceOf(owner);
-        //console.log("balanceOwner = " + balanceOwnerAfter);
-        assert.notEqual(totalSupply - balanceAccountThreeAfter - balanceAccountTwoAfter, balanceOwnerAfter);
+        //console.log("balanceOwner = " + Number(balanceOwnerAfter));
+        //assert.equal(Number(totalSupply - balanceAccountThreeAfter - balanceAccountTwoAfter), Number(balanceOwnerAfter));
 
     });
 
 
-    it('verification cap reached', async ()  => {
+/*
+    it('verification tokens limit min amount', async ()  => {
+        await contract.buyTokens(accounts[2],{from:accounts[2], value:buyWeiMin});
+    });
+*/
+
+
+    it('verification tokens cap reached', async ()  => {
             var numberTokensNormal = await contract.validPurchaseTokens.call(buyWei);
             //console.log("numberTokensNormal = " + numberTokensNormal);
             assert.equal(rate*buyWei, numberTokensNormal);
@@ -82,6 +99,7 @@ contract('SIRCrowdsale', (accounts) => {
             //console.log("numberTokensFault = " + numberTokensFault);
             assert.equal(0, numberTokensFault);
     });
+
 
 });
 
